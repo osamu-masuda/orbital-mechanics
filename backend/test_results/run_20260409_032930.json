@@ -1,0 +1,125 @@
+{
+  "timestamp": "20260409_032930",
+  "results": [
+    {
+      "preset_id": "iss-close",
+      "outcome": "timeout",
+      "score": 0,
+      "mission_time": 20000.0,
+      "docking_speed": 0,
+      "fuel_used": 66.0,
+      "max_range": 203.0,
+      "min_range": 203.3,
+      "maneuver_count": 666,
+      "checks": [
+        {
+          "name": "outcome",
+          "status": "error",
+          "detail": "timeout"
+        },
+        {
+          "name": "docking_speed",
+          "status": "ok",
+          "detail": "0.00 m/s"
+        },
+        {
+          "name": "fuel",
+          "status": "ok",
+          "detail": "1134 kg remaining"
+        }
+      ],
+      "passed": false,
+      "sim_time_ms": 332
+    },
+    {
+      "preset_id": "iss-1km",
+      "outcome": "timeout",
+      "score": 0,
+      "mission_time": 20000.0,
+      "docking_speed": 0,
+      "fuel_used": 328.0,
+      "max_range": 1017.0,
+      "min_range": 1016.5,
+      "maneuver_count": 666,
+      "checks": [
+        {
+          "name": "outcome",
+          "status": "error",
+          "detail": "timeout"
+        },
+        {
+          "name": "docking_speed",
+          "status": "ok",
+          "detail": "0.00 m/s"
+        },
+        {
+          "name": "fuel",
+          "status": "ok",
+          "detail": "872 kg remaining"
+        }
+      ],
+      "passed": false,
+      "sim_time_ms": 312
+    },
+    {
+      "preset_id": "iss-10km",
+      "outcome": "timeout",
+      "score": 0,
+      "mission_time": 20000.0,
+      "docking_speed": 0,
+      "fuel_used": 1009.0,
+      "max_range": 57749.0,
+      "min_range": 2000.2,
+      "maneuver_count": 666,
+      "checks": [
+        {
+          "name": "outcome",
+          "status": "error",
+          "detail": "timeout"
+        },
+        {
+          "name": "docking_speed",
+          "status": "ok",
+          "detail": "0.00 m/s"
+        },
+        {
+          "name": "fuel",
+          "status": "ok",
+          "detail": "191 kg remaining"
+        }
+      ],
+      "passed": false,
+      "sim_time_ms": 308
+    },
+    {
+      "preset_id": "hohmann",
+      "outcome": "timeout",
+      "score": 0,
+      "mission_time": 20000.0,
+      "docking_speed": 0,
+      "fuel_used": 281.0,
+      "max_range": 1635285.0,
+      "min_range": 49996.9,
+      "maneuver_count": 666,
+      "checks": [
+        {
+          "name": "outcome",
+          "status": "error",
+          "detail": "timeout"
+        },
+        {
+          "name": "docking_speed",
+          "status": "ok",
+          "detail": "0.00 m/s"
+        },
+        {
+          "name": "fuel",
+          "status": "ok",
+          "detail": "919 kg remaining"
+        }
+      ],
+      "passed": false,
+      "sim_time_ms": 320
+    }
+  ]
+}
