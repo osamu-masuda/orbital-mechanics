@@ -1,11 +1,13 @@
 /**
- * 3D Scene — Orbital view with Earth, target, and chaser spacecraft
+ * 3D Scene — Dual view: Orbit overview + Close-up rendezvous
+ *
+ * Top: small orbit overview (Earth + spacecraft positions)
+ * Main: close-up view centered on target, showing chaser approach
  */
 
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Html } from '@react-three/drei';
 import type { SpacecraftState, RelativeState, MissionPhase } from '../core/types';
-import { R_EARTH } from '../core/constants';
 
 interface Scene3DProps {
   target: SpacecraftState;
@@ -14,53 +16,107 @@ interface Scene3DProps {
   phase: MissionPhase;
 }
 
-const SCALE = 1e-6;
+/** Close-up view: target at center, positions in meters */
+function CloseView({ target, chaser, relative, phase }: Scene3DProps) {
+  const range = relative.range;
+  // Auto-scale: 1 unit = depends on range
+  const viewScale = Math.max(range * 2, 20);
 
-function Earth() {
-  return (
-    <mesh>
-      <sphereGeometry args={[R_EARTH * SCALE, 32, 32]} />
-      <meshStandardMaterial color="#2563eb" roughness={0.8} />
-    </mesh>
-  );
-}
+  // Chaser position relative to target (LVLH: x=V-bar, y=R-bar, z=H-bar)
+  const cx = relative.position.x;
+  const cy = relative.position.y;
+  const cz = relative.position.z;
 
-function Spacecraft({ state, color, label }: { state: SpacecraftState; color: string; label: string }) {
-  const pos = state.state.position;
-  return (
-    <group position={[pos.x * SCALE, pos.z * SCALE, pos.y * SCALE]}>
-      <mesh>
-        <boxGeometry args={[0.02, 0.02, 0.04]} />
-        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.3} />
-      </mesh>
-      <Html position={[0, 0.04, 0]} style={{ fontSize: 10, color, pointerEvents: 'none', whiteSpace: 'nowrap' }}>
-        {label}
-      </Html>
-    </group>
-  );
-}
+  // Normalize positions to viewScale
+  const s = 10 / viewScale;
 
-function SceneContent({ target, chaser }: { target: SpacecraftState; chaser: SpacecraftState }) {
-  return (
-    <>
-      <ambientLight intensity={0.3} />
-      <directionalLight position={[10, 10, 5]} intensity={1.0} />
-      <Earth />
-      <Spacecraft state={target} color="#f97316" label={target.name} />
-      <Spacecraft state={chaser} color="#22c55e" label={chaser.name} />
-      <OrbitControls makeDefault enableDamping dampingFactor={0.1} />
-    </>
-  );
-}
-
-export function Scene3D({ target, chaser }: Scene3DProps) {
   return (
     <Canvas
-      camera={{ position: [0, 0, 15], fov: 50, near: 0.001, far: 100 }}
+      camera={{ position: [0, 5 / s, 15 / s], fov: 50, near: 0.01, far: 10000 }}
       gl={{ antialias: true }}
       style={{ background: '#050510' }}
     >
-      <SceneContent target={target} chaser={chaser} />
+      <ambientLight intensity={0.4} />
+      <directionalLight position={[5, 10, 5]} intensity={0.8} />
+
+      {/* Target spacecraft (center) */}
+      <group position={[0, 0, 0]}>
+        <mesh>
+          <boxGeometry args={[2, 1, 4]} />
+          <meshStandardMaterial color="#f97316" emissive="#f97316" emissiveIntensity={0.2} />
+        </mesh>
+        {/* Solar panels */}
+        <mesh position={[0, 0, 6]}>
+          <boxGeometry args={[8, 0.1, 3]} />
+          <meshStandardMaterial color="#1e3a5f" metalness={0.8} />
+        </mesh>
+        <mesh position={[0, 0, -6]}>
+          <boxGeometry args={[8, 0.1, 3]} />
+          <meshStandardMaterial color="#1e3a5f" metalness={0.8} />
+        </mesh>
+        <Html position={[0, 3, 0]} style={{ fontSize: 11, color: '#f97316', pointerEvents: 'none', whiteSpace: 'nowrap' }}>
+          {target.name}
+        </Html>
+      </group>
+
+      {/* Chaser spacecraft */}
+      <group position={[cx * s, cy * s, cz * s]}>
+        <mesh>
+          <coneGeometry args={[0.8, 2.5, 8]} />
+          <meshStandardMaterial color="#22c55e" emissive="#22c55e" emissiveIntensity={0.2} />
+        </mesh>
+        <Html position={[0, 2.5, 0]} style={{ fontSize: 11, color: '#22c55e', pointerEvents: 'none', whiteSpace: 'nowrap' }}>
+          {chaser.name} ({range.toFixed(0)}m)
+        </Html>
+      </group>
+
+      {/* Range line */}
+      <line>
+        <bufferGeometry>
+          <bufferAttribute
+            attach="attributes-position"
+            args={[new Float32Array([0, 0, 0, cx * s, cy * s, cz * s]), 3]}
+          />
+        </bufferGeometry>
+        <lineBasicMaterial color="#ffffff" transparent opacity={0.3} />
+      </line>
+
+      {/* V-bar axis (green dashed) */}
+      <line>
+        <bufferGeometry>
+          <bufferAttribute
+            attach="attributes-position"
+            args={[new Float32Array([-20 / s, 0, 0, 20 / s, 0, 0]), 3]}
+          />
+        </bufferGeometry>
+        <lineBasicMaterial color="#22c55e" transparent opacity={0.15} />
+      </line>
+
+      {/* R-bar axis (orange) */}
+      <line>
+        <bufferGeometry>
+          <bufferAttribute
+            attach="attributes-position"
+            args={[new Float32Array([0, -10 / s, 0, 0, 10 / s, 0]), 3]}
+          />
+        </bufferGeometry>
+        <lineBasicMaterial color="#f97316" transparent opacity={0.15} />
+      </line>
+
+      {/* Axis labels */}
+      <Html position={[12 / s, 0, 0]} style={{ fontSize: 9, color: '#22c55e80', pointerEvents: 'none' }}>V-bar →</Html>
+      <Html position={[0, 8 / s, 0]} style={{ fontSize: 9, color: '#f9731680', pointerEvents: 'none' }}>↑ R-bar</Html>
+
+      {/* Phase indicator */}
+      <Html position={[0, -5 / s, 0]} style={{ fontSize: 12, color: phase === 'docked' ? '#22c55e' : '#d4a020', pointerEvents: 'none', fontFamily: 'monospace' }}>
+        {phase.toUpperCase()}
+      </Html>
+
+      <OrbitControls makeDefault enableDamping dampingFactor={0.1} />
     </Canvas>
   );
+}
+
+export function Scene3D(props: Scene3DProps) {
+  return <CloseView {...props} />;
 }

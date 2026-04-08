@@ -1,16 +1,16 @@
 {
-  "timestamp": "20260409_040905",
+  "timestamp": "20260409_040803",
   "results": [
     {
       "preset_id": "iss-close",
       "outcome": "docked",
-      "score": 49,
-      "mission_time": 1357.0,
-      "docking_speed": 0.49304176527982146,
-      "fuel_used": 22.0,
+      "score": 73,
+      "mission_time": 1431.0,
+      "docking_speed": 0.2545066051962996,
+      "fuel_used": 29.0,
       "max_range": 203.0,
       "min_range": 2.0,
-      "maneuver_count": 82,
+      "maneuver_count": 114,
       "checks": [
         {
           "name": "outcome",
@@ -20,27 +20,57 @@
         {
           "name": "docking_speed",
           "status": "ok",
-          "detail": "0.49 m/s"
+          "detail": "0.25 m/s"
         },
         {
           "name": "fuel",
           "status": "ok",
-          "detail": "1178 kg"
+          "detail": "1171 kg"
         }
       ],
       "passed": true,
-      "sim_time_ms": 22
+      "sim_time_ms": 21
     },
     {
       "preset_id": "iss-1km",
-      "outcome": "docked",
-      "score": 52,
-      "mission_time": 4575.0,
-      "docking_speed": 0.4425764651030444,
-      "fuel_used": 40.0,
+      "outcome": "collision",
+      "score": 0,
+      "mission_time": 3804.0,
+      "docking_speed": 0.6062902283253497,
+      "fuel_used": 91.0,
       "max_range": 1017.0,
       "min_range": 1.7,
-      "maneuver_count": 190,
+      "maneuver_count": 160,
+      "checks": [
+        {
+          "name": "outcome",
+          "status": "error",
+          "detail": "collision"
+        },
+        {
+          "name": "docking_speed",
+          "status": "error",
+          "detail": "0.61 m/s"
+        },
+        {
+          "name": "fuel",
+          "status": "ok",
+          "detail": "1109 kg"
+        }
+      ],
+      "passed": false,
+      "sim_time_ms": 56
+    },
+    {
+      "preset_id": "iss-10km",
+      "outcome": "docked",
+      "score": 14,
+      "mission_time": 15595.0,
+      "docking_speed": 0.23506249967449744,
+      "fuel_used": 634.0,
+      "max_range": 32345.0,
+      "min_range": 1.9,
+      "maneuver_count": 480,
       "checks": [
         {
           "name": "outcome",
@@ -50,46 +80,16 @@
         {
           "name": "docking_speed",
           "status": "ok",
-          "detail": "0.44 m/s"
+          "detail": "0.24 m/s"
         },
         {
           "name": "fuel",
           "status": "ok",
-          "detail": "1160 kg"
+          "detail": "566 kg"
         }
       ],
       "passed": true,
-      "sim_time_ms": 73
-    },
-    {
-      "preset_id": "iss-10km",
-      "outcome": "timeout",
-      "score": 0,
-      "mission_time": 50000.0,
-      "docking_speed": 0,
-      "fuel_used": 1200,
-      "max_range": 67883.0,
-      "min_range": 8212.8,
-      "maneuver_count": 465,
-      "checks": [
-        {
-          "name": "outcome",
-          "status": "error",
-          "detail": "timeout"
-        },
-        {
-          "name": "docking_speed",
-          "status": "ok",
-          "detail": "0.00 m/s"
-        },
-        {
-          "name": "fuel",
-          "status": "error",
-          "detail": "0 kg"
-        }
-      ],
-      "passed": false,
-      "sim_time_ms": 776
+      "sim_time_ms": 230
     },
     {
       "preset_id": "hohmann",
@@ -98,9 +98,9 @@
       "mission_time": 50000.0,
       "docking_speed": 0,
       "fuel_used": 1200,
-      "max_range": 764931.0,
-      "min_range": 14389.2,
-      "maneuver_count": 219,
+      "max_range": 774940.0,
+      "min_range": 14514.6,
+      "maneuver_count": 231,
       "checks": [
         {
           "name": "outcome",
@@ -119,7 +119,7 @@
         }
       ],
       "passed": false,
-      "sim_time_ms": 765
+      "sim_time_ms": 724
     }
   ]
 }

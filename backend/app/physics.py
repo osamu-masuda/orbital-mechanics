@@ -81,35 +81,54 @@ def from_lvlh(dv_lvlh: Vec3, vHat: Vec3, rHat: Vec3, hHat: Vec3) -> Vec3:
 
 # === Autopilot ===
 
-def compute_autopilot_dv(rel_pos: Vec3, rel_vel: Vec3, rng: float, phase: str) -> Vec3:
+hohmann_done = False  # module-level flag
+
+def compute_autopilot_dv(rel_pos: Vec3, rel_vel: Vec3, rng: float, phase: str,
+                          t_pos: Vec3 = None, c_pos: Vec3 = None) -> Vec3:
     """Compute delta-V in LVLH frame"""
+    global hohmann_done
+
     if phase == 'phasing':
-        # Boost prograde/retrograde to change orbit and drift toward target
-        # Larger boost for larger ranges
-        boost = min(0.5, rng * 0.00002)
-        # Also correct R-bar offset (altitude difference)
-        r_correct = -rel_pos.y * 0.0005 - rel_vel.y * 0.02
-        if rel_pos.x > 50:
-            return Vec3(boost, r_correct, 0)
-        elif rel_pos.x < -50:
-            return Vec3(-boost, r_correct, 0)
-        return Vec3(0, r_correct, 0)
+        # If large R-bar offset (altitude difference > 1km), do Hohmann transfer
+        r_bar = abs(rel_pos.y)
+        if r_bar > 1000 and not hohmann_done and t_pos and c_pos:
+            # Hohmann: compute prograde ΔV to raise/lower orbit to match target
+            r_chaser = c_pos.mag()
+            r_target = t_pos.mag()
+            v_circ = math.sqrt(MU_EARTH / r_chaser)
+            # Transfer orbit semi-major axis
+            a_transfer = (r_chaser + r_target) / 2
+            v_transfer = math.sqrt(MU_EARTH * (2/r_chaser - 1/a_transfer))
+            dv1 = v_transfer - v_circ  # prograde burn
+            hohmann_done = True
+            return Vec3(dv1, 0, 0)  # prograde in LVLH
+
+        # PD phasing: V-bar drift + gentle R-bar/H-bar correction
+        boost = min(0.3, abs(rel_pos.x) * 0.00004)
+        dvx = boost if rel_pos.x > 50 else -boost if rel_pos.x < -50 else 0
+        # Very gentle altitude correction to avoid orbit perturbation
+        dvy = -rel_pos.y * 0.00005 - rel_vel.y * 0.005
+        dvz = -rel_pos.z * 0.00005 - rel_vel.z * 0.005
+        return Vec3(dvx, dvy, dvz)
 
     if phase == 'approach':
-        # PD control: approach along V-bar, null R-bar and H-bar
-        dvx = -rel_pos.x * 0.0002 - rel_vel.x * 0.01
-        dvy = -rel_pos.y * 0.001 - rel_vel.y * 0.05
-        dvz = -rel_pos.z * 0.001 - rel_vel.z * 0.05
-        # Limit magnitude
+        # PD control with range-dependent gains
+        # Gentler as we get closer to prevent overshoot
+        g_pos = 0.0001 if rng > 1000 else 0.00005
+        g_vel = 0.005 if rng > 1000 else 0.02
+        dvx = -rel_pos.x * g_pos - rel_vel.x * g_vel
+        dvy = -rel_pos.y * g_pos * 5 - rel_vel.y * g_vel * 3
+        dvz = -rel_pos.z * g_pos * 5 - rel_vel.z * g_vel * 3
         dv = Vec3(dvx, dvy, dvz)
         mag = dv.mag()
-        if mag > 0.5:
-            dv = dv.scale(0.5 / mag)
+        max_dv = 0.3 if rng > 500 else 0.1
+        if mag > max_dv:
+            dv = dv.scale(max_dv / mag)
         return dv
 
     if phase in ('proximity', 'final-approach'):
         # Fine PD: target closing rate proportional to range
-        target_rate = -0.1 if rng > 10 else -0.03 if rng > 3 else -0.01
+        target_rate = -0.08 if rng > 10 else -0.02 if rng > 3 else -0.005
         rhat = rel_pos.norm()
         current_rate = rel_vel.dot(rhat) if rng > 0.1 else 0
 
@@ -163,6 +182,8 @@ def run_simulation(preset_id: str, pilot_mode: str = "full-auto") -> SimResult:
     t_pos, t_vel = circular_orbit_state(preset["alt"], inc, 0)
     c_pos, c_vel = circular_orbit_state(preset["chaser_alt"], inc, -preset["phase_lag"])
 
+    global hohmann_done
+    hohmann_done = False
     fuel = preset["fuel"]
     initial_fuel = fuel
     chaser_mass = 12000
@@ -201,8 +222,10 @@ def run_simulation(preset_id: str, pilot_mode: str = "full-auto") -> SimResult:
         phase = "final-approach" if rng < 10 else "proximity" if rng < 100 else "approach" if rng < 5000 else "phasing"
 
         # Autopilot
-        if pilot_mode == "full-auto" and int(t) % maneuver_interval == 0 and fuel > 0:
-            dv_lvlh = compute_autopilot_dv(rel_pos, rel_vel, rng, phase)
+        # Maneuver interval varies by phase
+        interval = 60 if phase == "phasing" else 10 if phase in ("proximity", "final-approach") else 30
+        if pilot_mode == "full-auto" and int(t) % interval == 0 and fuel > 0:
+            dv_lvlh = compute_autopilot_dv(rel_pos, rel_vel, rng, phase, t_pos, c_pos)
             dv_mag = dv_lvlh.mag()
             if dv_mag > 0.0001:
                 # Convert LVLH dV to ECI

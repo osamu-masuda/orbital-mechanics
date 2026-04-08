@@ -36,7 +36,7 @@ export interface UseSimulationReturn {
 export function useSimulation(): UseSimulationReturn {
   const [preset, setPresetState] = useState<MissionPreset>(DEFAULT_PRESET);
   const [pilotMode, setPilotMode] = useState<PilotMode>('semi-auto');
-  const [speed, setSpeed] = useState(1.0);
+  const [speed, setSpeed] = useState(10.0);
   const [isRunning, setIsRunning] = useState(false);
   const [missionTime, setMissionTime] = useState(0);
   const [result, setResult] = useState<MissionResult | null>(null);
