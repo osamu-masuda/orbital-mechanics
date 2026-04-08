@@ -1,5 +1,5 @@
 {
-  "timestamp": "20260409_034634",
+  "timestamp": "20260409_034556",
   "results": [
     {
       "preset_id": "iss-close",
@@ -29,7 +29,7 @@
         }
       ],
       "passed": true,
-      "sim_time_ms": 53
+      "sim_time_ms": 57
     },
     {
       "preset_id": "iss-1km",
@@ -59,18 +59,18 @@
         }
       ],
       "passed": true,
-      "sim_time_ms": 116
+      "sim_time_ms": 126
     },
     {
       "preset_id": "iss-10km",
       "outcome": "timeout",
       "score": 0,
-      "mission_time": 50000.0,
+      "mission_time": 20000.0,
       "docking_speed": 0,
       "fuel_used": 1200,
-      "max_range": 7882877.0,
-      "min_range": 9683.1,
-      "maneuver_count": 164,
+      "max_range": 6078080.0,
+      "min_range": 10129.2,
+      "maneuver_count": 74,
       "checks": [
         {
           "name": "outcome",
@@ -89,17 +89,17 @@
         }
       ],
       "passed": false,
-      "sim_time_ms": 705
+      "sim_time_ms": 297
     },
     {
       "preset_id": "hohmann",
       "outcome": "timeout",
       "score": 0,
-      "mission_time": 50000.0,
+      "mission_time": 20000.0,
       "docking_speed": 0,
       "fuel_used": 1200,
-      "max_range": 5741132.0,
-      "min_range": 49105.3,
+      "max_range": 4423936.0,
+      "min_range": 52594.1,
       "maneuver_count": 25,
       "checks": [
         {
@@ -119,7 +119,7 @@
         }
       ],
       "passed": false,
-      "sim_time_ms": 704
+      "sim_time_ms": 294
     }
   ]
 }
