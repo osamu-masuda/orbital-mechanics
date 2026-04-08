@@ -79,9 +79,32 @@ def from_lvlh(dv_lvlh: Vec3, vHat: Vec3, rHat: Vec3, hHat: Vec3) -> Vec3:
         dv_lvlh.x * vHat.z + dv_lvlh.y * rHat.z + dv_lvlh.z * hHat.z,
     )
 
+# === Tunable Parameters ===
+
+TUNING = {
+    "phasing_boost_gain": 0.00004,
+    "phasing_boost_max": 0.3,
+    "phasing_rbar_gain": 0.00005,
+    "phasing_rbar_vel_gain": 0.005,
+    "approach_pos_gain_far": 0.0001,
+    "approach_pos_gain_near": 0.00005,
+    "approach_vel_gain_far": 0.005,
+    "approach_vel_gain_near": 0.02,
+    "approach_max_dv_far": 0.3,
+    "approach_max_dv_near": 0.1,
+    "proximity_target_rate_far": -0.08,
+    "proximity_target_rate_near": -0.02,
+    "proximity_target_rate_final": -0.005,
+    "proximity_pos_gain": 0.002,
+    "proximity_vel_gain": 0.05,
+}
+
+def set_tuning(params: dict):
+    TUNING.update(params)
+
 # === Autopilot ===
 
-hohmann_done = False  # module-level flag
+hohmann_done = False
 
 def compute_autopilot_dv(rel_pos: Vec3, rel_vel: Vec3, rng: float, phase: str,
                           t_pos: Vec3 = None, c_pos: Vec3 = None) -> Vec3:
@@ -104,31 +127,28 @@ def compute_autopilot_dv(rel_pos: Vec3, rel_vel: Vec3, rng: float, phase: str,
             return Vec3(dv1, 0, 0)  # prograde in LVLH
 
         # PD phasing: V-bar drift + gentle R-bar/H-bar correction
-        boost = min(0.3, abs(rel_pos.x) * 0.00004)
+        boost = min(TUNING["phasing_boost_max"], abs(rel_pos.x) * TUNING["phasing_boost_gain"])
         dvx = boost if rel_pos.x > 50 else -boost if rel_pos.x < -50 else 0
-        # Very gentle altitude correction to avoid orbit perturbation
-        dvy = -rel_pos.y * 0.00005 - rel_vel.y * 0.005
-        dvz = -rel_pos.z * 0.00005 - rel_vel.z * 0.005
+        dvy = -rel_pos.y * TUNING["phasing_rbar_gain"] - rel_vel.y * TUNING["phasing_rbar_vel_gain"]
+        dvz = -rel_pos.z * TUNING["phasing_rbar_gain"] - rel_vel.z * TUNING["phasing_rbar_vel_gain"]
         return Vec3(dvx, dvy, dvz)
 
     if phase == 'approach':
-        # PD control with range-dependent gains
-        # Gentler as we get closer to prevent overshoot
-        g_pos = 0.0001 if rng > 1000 else 0.00005
-        g_vel = 0.005 if rng > 1000 else 0.02
+        g_pos = TUNING["approach_pos_gain_far"] if rng > 1000 else TUNING["approach_pos_gain_near"]
+        g_vel = TUNING["approach_vel_gain_far"] if rng > 1000 else TUNING["approach_vel_gain_near"]
         dvx = -rel_pos.x * g_pos - rel_vel.x * g_vel
         dvy = -rel_pos.y * g_pos * 5 - rel_vel.y * g_vel * 3
         dvz = -rel_pos.z * g_pos * 5 - rel_vel.z * g_vel * 3
         dv = Vec3(dvx, dvy, dvz)
         mag = dv.mag()
-        max_dv = 0.3 if rng > 500 else 0.1
+        max_dv = TUNING["approach_max_dv_far"] if rng > 500 else TUNING["approach_max_dv_near"]
         if mag > max_dv:
             dv = dv.scale(max_dv / mag)
         return dv
 
     if phase in ('proximity', 'final-approach'):
         # Fine PD: target closing rate proportional to range
-        target_rate = -0.08 if rng > 10 else -0.02 if rng > 3 else -0.005
+        target_rate = TUNING["proximity_target_rate_far"] if rng > 10 else TUNING["proximity_target_rate_near"] if rng > 3 else TUNING["proximity_target_rate_final"]
         rhat = rel_pos.norm()
         current_rate = rel_vel.dot(rhat) if rng > 0.1 else 0
 
