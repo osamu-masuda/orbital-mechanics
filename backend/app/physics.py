@@ -120,8 +120,12 @@ def compute_autopilot_dv(rel_pos: Vec3, rel_vel: Vec3, rng: float, phase: str,
             hohmann_state["burn2_done"] = True
             return Vec3(dv2, 0, 0)  # prograde circularization
 
-        # Hohmann burn 1: transfer to target altitude
-        if r_bar > 1000 and not hohmann_state["burn1_done"] and t_pos and c_pos:
+        # コースト中（バーン1済み、バーン2未実行）はゼロdV
+        if hohmann_state["burn1_done"] and not hohmann_state["burn2_done"]:
+            return Vec3()
+
+        # Hohmann burn 1: transfer to target altitude（10km以上の高度差のみ）
+        if r_bar > 10000 and not hohmann_state["burn1_done"] and t_pos and c_pos:
             r_chaser = c_pos.mag()
             r_target = t_pos.mag()
             v_circ_1 = math.sqrt(MU_EARTH / r_chaser)
@@ -198,11 +202,23 @@ class SimResult:
     samples: list[dict] = field(default_factory=list)
     checks: list[dict] = field(default_factory=list)
 
+def hohmann_phase_lag(chaser_alt: float, target_alt: float) -> float:
+    """ホーマン遷移の解析的な初期位相遅れを計算
+    遷移半周期中にターゲットが進む角度を考慮し、到着時に一致する位相を返す"""
+    r1 = R_EARTH + chaser_alt
+    r2 = R_EARTH + target_alt
+    a_transfer = (r1 + r2) / 2
+    transfer_half = math.pi * math.sqrt(a_transfer ** 3 / MU_EARTH)
+    n2 = math.sqrt(MU_EARTH / (r2 ** 3))  # ターゲット平均運動
+    target_angle = n2 * transfer_half  # 遷移中にターゲットが進む角度
+    return math.pi - target_angle
+
 PRESETS = {
     "iss-close": {"alt": ISS_ALTITUDE, "chaser_alt": ISS_ALTITUDE, "phase_lag": 0.00003, "fuel": 1200},
     "iss-1km": {"alt": ISS_ALTITUDE, "chaser_alt": ISS_ALTITUDE, "phase_lag": 0.00015, "fuel": 1200},
     "iss-10km": {"alt": ISS_ALTITUDE, "chaser_alt": ISS_ALTITUDE - 2000, "phase_lag": 0.0015, "fuel": 1200},
-    "hohmann": {"alt": ISS_ALTITUDE, "chaser_alt": ISS_ALTITUDE - 50000, "phase_lag": 0.01, "fuel": 1200},
+    "hohmann": {"alt": ISS_ALTITUDE, "chaser_alt": ISS_ALTITUDE - 50000,
+                "phase_lag": hohmann_phase_lag(ISS_ALTITUDE - 50000, ISS_ALTITUDE), "fuel": 1200},
 }
 
 def run_simulation(preset_id: str, pilot_mode: str = "full-auto") -> SimResult:
