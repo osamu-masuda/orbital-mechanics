@@ -23,7 +23,8 @@ from sim_loop import record_run, record_lesson, get_lessons
 from sim_loop.recorder import get_latest_run
 from sim_loop.optimizer import optimize_parameters, OptimizationConfig
 
-DB_PATH = str(Path(__file__).parent / "sim_loop" / "sim-loop.db")
+# データは shared-db (PostgreSQL) に保存される
+# 接続先は SHARED_DB_URL 環境変数で指定（デフォルト: postgresql://...@192.168.11.4:15432/loop_data）
 
 def run_all_tests(presets=None):
     if presets is None:
@@ -69,7 +70,7 @@ def run_optimization(method="grid"):
                 "approach_pos_gain_near": [0.00003, 0.00005, 0.0001],
                 "approach_vel_gain_near": [0.01, 0.02, 0.03],
             },
-            simulate_fn=simulate, method="grid", max_iterations=81, db_path=DB_PATH,
+            simulate_fn=simulate, method="grid", max_iterations=81,
         )
     else:
         config = OptimizationConfig(
@@ -81,7 +82,7 @@ def run_optimization(method="grid"):
                 "approach_vel_gain_near": (0.005, 0.05),
                 "proximity_target_rate_far": (-0.15, -0.03),
             },
-            simulate_fn=simulate, method=method, max_iterations=40, db_path=DB_PATH,
+            simulate_fn=simulate, method=method, max_iterations=40,
         )
 
     result = optimize_parameters(config)
@@ -99,7 +100,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.lessons:
-        for l in get_lessons("orbital-mechanics", DB_PATH):
+        for l in get_lessons("orbital-mechanics"):
             print(f"  [{l['severity']}] {l['pattern']}: {l['solution']}")
     elif args.optimize:
         run_optimization(args.method)
@@ -107,7 +108,7 @@ if __name__ == "__main__":
         results = run_all_tests([args.preset] if args.preset else None)
         print_results(results)
         # 親ラン取得して系譜を記録
-        parent = get_latest_run("orbital-mechanics", db_path=DB_PATH)
+        parent = get_latest_run("orbital-mechanics")
         parent_id = parent["id"] if parent else None
         record_run("orbital-mechanics", dict(TUNING), results, method="manual",
-                   parent_run_id=parent_id, db_path=DB_PATH)
+                   parent_run_id=parent_id)

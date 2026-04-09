@@ -2,3 +2,12 @@ node_modules
 dist
 .env
 *.local
+
+# sim-loop データは shared-db (PostgreSQL) に移行済み
+# 旧 SQLite ファイルは履歴のため残置するが git 追跡しない
+backend/sim_loop/sim-loop.db
+backend/sim_loop/sim-loop.db-journal
+backend/sim_loop/sim-loop.db-wal
+backend/sim_loop/sim-loop.db-shm
+__pycache__/
+*.pyc
