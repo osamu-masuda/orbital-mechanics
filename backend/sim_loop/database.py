@@ -1,24 +1,29 @@
 """
-Sim-Loop — Database Connection
+Sim-Loop — Database Connection (PostgreSQL via shared-db)
+
+設計: common/docs/sim-loop-aggregation-design-2026-04-09.md
+
+SHARED_DB_URL 環境変数で接続先を指定。デフォルトは fatty4:15432。
+SQLite から PostgreSQL へ移行済み。db_path 引数は後方互換のため残っているが無視される。
 """
 
-import sqlite3
 import os
-from pathlib import Path
-from .models import SCHEMA
 
-DEFAULT_DB_PATH = os.environ.get("SIM_LOOP_DB", str(Path(__file__).parent / "sim-loop.db"))
+import psycopg2
+import psycopg2.extras
 
-def get_db(db_path: str = DEFAULT_DB_PATH) -> sqlite3.Connection:
-    db = sqlite3.connect(db_path)
-    db.row_factory = sqlite3.Row
-    db.execute("PRAGMA journal_mode=WAL")
-    db.execute("PRAGMA busy_timeout=5000")
-    return db
+DEFAULT_SHARED_DB_URL = "postgresql://loop_writer:changeme@192.168.11.4:15432/loop_data"
 
-def init_db(db_path: str = DEFAULT_DB_PATH):
-    os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)
-    db = get_db(db_path)
-    db.executescript(SCHEMA)
-    db.commit()
-    db.close()
+
+def _get_url() -> str:
+    return os.environ.get("SHARED_DB_URL", DEFAULT_SHARED_DB_URL)
+
+
+def get_db(db_path: str = None):
+    """PostgreSQL 接続を返す。db_path 引数は後方互換のため無視。"""
+    return psycopg2.connect(_get_url())
+
+
+def init_db(db_path: str = None):
+    """スキーマは shared-db/init/01-schema.sql で初期化されているため no-op。"""
+    pass
