@@ -122,6 +122,80 @@ export function elementsToState(elements: OrbitalElements): StateVector {
 }
 
 /**
+ * Convert ECI state vector back to classical orbital elements
+ */
+export function stateToElements(state: StateVector): OrbitalElements {
+  const { position: r, velocity: v } = state;
+  const rMag = Math.sqrt(r.x * r.x + r.y * r.y + r.z * r.z);
+  const vMag = Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+
+  // Specific angular momentum h = r × v
+  const h: Vec3 = {
+    x: r.y * v.z - r.z * v.y,
+    y: r.z * v.x - r.x * v.z,
+    z: r.x * v.y - r.y * v.x,
+  };
+  const hMag = Math.sqrt(h.x * h.x + h.y * h.y + h.z * h.z);
+
+  // Node vector n = k × h
+  const n: Vec3 = { x: -h.y, y: h.x, z: 0 };
+  const nMag = Math.sqrt(n.x * n.x + n.y * n.y);
+
+  // Eccentricity vector e = (v × h)/μ - r̂
+  const vxh: Vec3 = {
+    x: v.y * h.z - v.z * h.y,
+    y: v.z * h.x - v.x * h.z,
+    z: v.x * h.y - v.y * h.x,
+  };
+  const eVec: Vec3 = {
+    x: vxh.x / MU_EARTH - r.x / rMag,
+    y: vxh.y / MU_EARTH - r.y / rMag,
+    z: vxh.z / MU_EARTH - r.z / rMag,
+  };
+  const ecc = Math.sqrt(eVec.x * eVec.x + eVec.y * eVec.y + eVec.z * eVec.z);
+
+  // Semi-major axis from vis-viva
+  const energy = vMag * vMag / 2 - MU_EARTH / rMag;
+  const sma = -MU_EARTH / (2 * energy);
+
+  // Inclination
+  const inc = Math.acos(Math.max(-1, Math.min(1, h.z / hMag)));
+
+  // RAAN
+  let raan = 0;
+  if (nMag > 1e-10) {
+    raan = Math.acos(Math.max(-1, Math.min(1, n.x / nMag)));
+    if (n.y < 0) raan = 2 * Math.PI - raan;
+  }
+
+  // Argument of periapsis
+  let argPe = 0;
+  if (nMag > 1e-10 && ecc > 1e-10) {
+    const dot = (n.x * eVec.x + n.y * eVec.y + n.z * eVec.z) / (nMag * ecc);
+    argPe = Math.acos(Math.max(-1, Math.min(1, dot)));
+    if (eVec.z < 0) argPe = 2 * Math.PI - argPe;
+  }
+
+  // True anomaly
+  let trueAnomaly = 0;
+  if (ecc > 1e-10) {
+    const dot = (eVec.x * r.x + eVec.y * r.y + eVec.z * r.z) / (ecc * rMag);
+    trueAnomaly = Math.acos(Math.max(-1, Math.min(1, dot)));
+    const rdotv = r.x * v.x + r.y * v.y + r.z * v.z;
+    if (rdotv < 0) trueAnomaly = 2 * Math.PI - trueAnomaly;
+  } else {
+    // Circular orbit: use argument of latitude
+    if (nMag > 1e-10) {
+      const dot = (n.x * r.x + n.y * r.y + n.z * r.z) / (nMag * rMag);
+      trueAnomaly = Math.acos(Math.max(-1, Math.min(1, dot)));
+      if (r.z < 0) trueAnomaly = 2 * Math.PI - trueAnomaly;
+    }
+  }
+
+  return { sma, ecc: Math.max(ecc, 1e-8), inc, raan, argPe, trueAnomaly };
+}
+
+/**
  * Compute relative state of chaser w.r.t. target in LVLH frame
  */
 export function computeRelativeState(

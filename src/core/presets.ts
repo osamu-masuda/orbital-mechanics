@@ -7,7 +7,7 @@
  */
 
 import type { MissionPreset, SpacecraftState, OrbitalElements } from './types';
-import { R_EARTH, ISS_ALTITUDE } from './constants';
+import { R_EARTH, ISS_ALTITUDE, MU_EARTH } from './constants';
 
 function makeCircularOrbit(altitude: number, inc: number, raan: number, trueAnomaly: number): OrbitalElements {
   return {
@@ -46,6 +46,20 @@ function makeChaser(altitude: number, phaseLag: number, name: string): Spacecraf
     isp: 290,
     dockingPort: { x: -2, y: 0, z: 0 }, // aft port
   };
+}
+
+/**
+ * ホーマン遷移の位相角を解析的に計算
+ * 遷移中にターゲットが移動する角度を考慮し、到着時に一致する初期位相差を返す
+ */
+function hohmannPhaseLag(chaserAlt: number, targetAlt: number): number {
+  const r1 = R_EARTH + chaserAlt;
+  const r2 = R_EARTH + targetAlt;
+  const aTransfer = (r1 + r2) / 2;
+  const transferHalf = Math.PI * Math.sqrt(aTransfer ** 3 / MU_EARTH);
+  const n2 = Math.sqrt(MU_EARTH / (r2 ** 3)); // ターゲット平均運動
+  const targetAngle = n2 * transferHalf; // 遷移中にターゲットが進む角度
+  return Math.PI - targetAngle; // 初期位相遅れ（正=チェーサーが後方）
 }
 
 export const PRESETS: MissionPreset[] = [
@@ -97,7 +111,7 @@ export const PRESETS: MissionPreset[] = [
     description: 'Start in lower orbit, 50 km below. Perform Hohmann transfer to match target.',
     config: {
       target: makeTarget(ISS_ALTITUDE),
-      chaser: makeChaser(ISS_ALTITUDE - 50000, 0.01, 'Progress'),
+      chaser: makeChaser(ISS_ALTITUDE - 50000, hohmannPhaseLag(ISS_ALTITUDE - 50000, ISS_ALTITUDE), 'Progress'),
       approachType: 'v-bar',
       dockingSpeed: 0.3,
       dockingAlignment: 5 * Math.PI / 180,

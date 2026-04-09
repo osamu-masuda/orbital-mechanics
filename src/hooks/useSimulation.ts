@@ -10,6 +10,7 @@ import { PHYSICS_DT } from '../core/constants';
 import { elementsToState } from '../core/kepler';
 import { stepSimulation } from '../core/simulation';
 import { PRESETS, DEFAULT_PRESET } from '../core/presets';
+import { initGuidance, guidanceStep, type GuidanceState } from '../core/guidance';
 
 const HISTORY_MAX = 600;
 
@@ -68,6 +69,7 @@ export function useSimulation(): UseSimulationReturn {
   const rafRef = useRef(0);
   const lastRef = useRef(0);
   const accumRef = useRef(0);
+  const guidanceRef = useRef<GuidanceState | null>(null);
 
   const tick = useCallback((timestamp: number) => {
     if (lastRef.current === 0) lastRef.current = timestamp;
@@ -76,6 +78,21 @@ export function useSimulation(): UseSimulationReturn {
     accumRef.current += elapsed * speedRef.current;
 
     while (accumRef.current >= PHYSICS_DT) {
+      // 誘導: バーン判定（stepSimulation の前に実行して ΔV を適用）
+      if (guidanceRef.current && guidanceRef.current.phase !== 'complete') {
+        // 前回の relative state を渡す（burn2 後の接近誘導で使用）
+        const prevRel = { position: { x: 0, y: 0, z: 0 }, velocity: { x: 0, y: 0, z: 0 }, range: relative.range, rangeRate: relative.rangeRate };
+        Object.assign(prevRel, relative);
+        const gResult = guidanceStep(
+          guidanceRef.current,
+          chaserRef.current,
+          timeRef.current,
+          prevRel,
+        );
+        guidanceRef.current = gResult.guidance;
+        chaserRef.current = gResult.chaser;
+      }
+
       const { target: newT, chaser: newC, relative: newR, phase: newP } =
         stepSimulation(targetRef.current, chaserRef.current, PHYSICS_DT);
 
@@ -133,11 +150,17 @@ export function useSimulation(): UseSimulationReturn {
   const start = useCallback(() => {
     if (isRunning) return;
     setResult(null);
+    // hohmann プリセットの場合、自動誘導を初期化
+    if (preset.id === 'hohmann') {
+      guidanceRef.current = initGuidance(chaserRef.current, targetRef.current);
+    } else {
+      guidanceRef.current = null;
+    }
     setIsRunning(true);
     lastRef.current = 0;
     accumRef.current = 0;
     rafRef.current = requestAnimationFrame(tick);
-  }, [isRunning, tick]);
+  }, [isRunning, tick, preset]);
 
   const reset = useCallback(() => {
     cancelAnimationFrame(rafRef.current);
@@ -151,6 +174,7 @@ export function useSimulation(): UseSimulationReturn {
     setResult(null);
     setIsRunning(false);
     historyRef.current = [];
+    guidanceRef.current = null;
   }, [preset, initSpacecraft]);
 
   const setPreset = useCallback((id: string) => {
@@ -168,6 +192,7 @@ export function useSimulation(): UseSimulationReturn {
     setResult(null);
     setIsRunning(false);
     historyRef.current = [];
+    guidanceRef.current = null;
   }, [initSpacecraft]);
 
   const applyManeuver = useCallback((_dv: Vec3) => {
