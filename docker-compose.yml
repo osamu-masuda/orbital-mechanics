@@ -21,6 +21,9 @@ services:
       context: ./backend
     ports:
       - "${HOST_BIND:-127.0.0.1}:${API_PORT:-5821}:8000"
+    environment:
+      # shared-db (PostgreSQL) — sim-loop データ書き込み先
+      - SHARED_DB_URL=${SHARED_DB_URL:-postgresql://loop_writer:changeme@192.168.11.4:15432/loop_data}
     volumes:
       - api-data:/app/data
     restart: unless-stopped
