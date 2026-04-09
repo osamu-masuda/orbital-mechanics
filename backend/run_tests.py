@@ -20,6 +20,7 @@ from app.physics import run_simulation, PRESETS, set_tuning, TUNING
 
 sys.path.insert(0, str(Path(__file__).parent / "sim_loop"))
 from sim_loop import record_run, record_lesson, get_lessons
+from sim_loop.recorder import get_latest_run
 from sim_loop.optimizer import optimize_parameters, OptimizationConfig
 
 DB_PATH = str(Path(__file__).parent / "sim_loop" / "sim-loop.db")
@@ -105,4 +106,8 @@ if __name__ == "__main__":
     else:
         results = run_all_tests([args.preset] if args.preset else None)
         print_results(results)
-        record_run("orbital-mechanics", dict(TUNING), results, method="manual", db_path=DB_PATH)
+        # 親ラン取得して系譜を記録
+        parent = get_latest_run("orbital-mechanics", db_path=DB_PATH)
+        parent_id = parent["id"] if parent else None
+        record_run("orbital-mechanics", dict(TUNING), results, method="manual",
+                   parent_run_id=parent_id, db_path=DB_PATH)
