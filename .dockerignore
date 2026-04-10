@@ -1,0 +1,13 @@
+node_modules
+dist
+.next
+.git
+.env
+.env.local
+*.log
+backend/__pycache__
+backend/sim_loop/__pycache__
+backend/sim_loop/sim-loop.db
+backend/sim_loop/sim-loop.db-journal
+docs
+README.md
