@@ -1,65 +1,32 @@
 /**
  * Orbital Mechanics — Kepler Equation Solver
  *
- * Converts between time and position on an elliptical orbit.
- * Uses Newton-Raphson iteration on Kepler's equation: M = E - e*sin(E)
+ * ベクトル演算・基本 Kepler ソルバは `shared/physics` を利用。
+ * orbital-mechanics 固有の OrbitalElements シグネチャ (sma/ecc/inc/raan/argPe/trueAnomaly)
+ * に合わせた薄ラッパを提供する。
  */
 
 import type { OrbitalElements, StateVector, Vec3 } from './types';
 import { MU_EARTH } from './constants';
+import {
+  solveKepler,
+  eccentricToTrue,
+  trueToEccentric,
+  trueToMean,
+} from '../shared/physics/kepler';
+import {
+  vCross,
+  vDot,
+  vLength,
+  vNorm as vUnit,
+  vSub,
+} from '../shared/physics/vectors';
+
+// shared/physics からそのまま再エクスポート (呼び出し側の互換維持)
+export { solveKepler, eccentricToTrue, trueToEccentric, trueToMean };
 
 /**
- * Solve Kepler's equation: M = E - e*sin(E)
- * Given mean anomaly M and eccentricity e, find eccentric anomaly E
- *
- * @param M - Mean anomaly [rad]
- * @param e - Eccentricity
- * @returns Eccentric anomaly E [rad]
- */
-export function solveKepler(M: number, e: number): number {
-  // Initial guess
-  let E = M + e * Math.sin(M);
-
-  // Newton-Raphson iteration
-  for (let i = 0; i < 20; i++) {
-    const dE = (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
-    E -= dE;
-    if (Math.abs(dE) < 1e-12) break;
-  }
-
-  return E;
-}
-
-/**
- * Eccentric anomaly to true anomaly
- */
-export function eccentricToTrue(E: number, e: number): number {
-  return 2 * Math.atan2(
-    Math.sqrt(1 + e) * Math.sin(E / 2),
-    Math.sqrt(1 - e) * Math.cos(E / 2),
-  );
-}
-
-/**
- * True anomaly to eccentric anomaly
- */
-export function trueToEccentric(nu: number, e: number): number {
-  return 2 * Math.atan2(
-    Math.sqrt(1 - e) * Math.sin(nu / 2),
-    Math.sqrt(1 + e) * Math.cos(nu / 2),
-  );
-}
-
-/**
- * Mean anomaly from true anomaly
- */
-export function trueToMean(nu: number, e: number): number {
-  const E = trueToEccentric(nu, e);
-  return E - e * Math.sin(E);
-}
-
-/**
- * Propagate orbital elements forward by dt seconds
+ * 軌道要素を dt 秒進める (平均運動 M を線形増加)
  */
 export function propagateOrbit(elements: OrbitalElements, dt: number): OrbitalElements {
   const { sma, ecc } = elements;
@@ -73,25 +40,22 @@ export function propagateOrbit(elements: OrbitalElements, dt: number): OrbitalEl
 }
 
 /**
- * Convert orbital elements to ECI state vector
+ * 古典軌道要素 → ECI 状態ベクトル
+ * (physics.elementsToState を利用しつつ、orbital-mechanics の
+ * フィールド名 sma/ecc/inc/argPe/trueAnomaly にマップする)
  */
 export function elementsToState(elements: OrbitalElements): StateVector {
   const { sma, ecc, inc, raan, argPe, trueAnomaly: nu } = elements;
 
-  // Distance from focus
-  const p = sma * (1 - ecc * ecc); // semi-latus rectum
+  const p = sma * (1 - ecc * ecc);
   const r = p / (1 + ecc * Math.cos(nu));
-
-  // Position in orbital plane (PQW frame)
   const xPQW = r * Math.cos(nu);
   const yPQW = r * Math.sin(nu);
 
-  // Velocity in orbital plane
   const mu_p = Math.sqrt(MU_EARTH / p);
   const vxPQW = -mu_p * Math.sin(nu);
   const vyPQW = mu_p * (ecc + Math.cos(nu));
 
-  // Rotation matrix PQW → ECI
   const cosO = Math.cos(raan);
   const sinO = Math.sin(raan);
   const cosI = Math.cos(inc);
@@ -122,40 +86,36 @@ export function elementsToState(elements: OrbitalElements): StateVector {
 }
 
 /**
- * Convert ECI state vector back to classical orbital elements
+ * ECI 状態ベクトル → 古典軌道要素
+ * (physics の vector ops を利用、orbital-mechanics 固有の返り値シグネチャに合わせる)
  */
 export function stateToElements(state: StateVector): OrbitalElements {
   const { position: r, velocity: v } = state;
-  const rMag = Math.sqrt(r.x * r.x + r.y * r.y + r.z * r.z);
-  const vMag = Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+  const rMag = vLength(r);
+  const vMag = vLength(v);
 
-  // Specific angular momentum h = r × v
-  const h: Vec3 = {
-    x: r.y * v.z - r.z * v.y,
-    y: r.z * v.x - r.x * v.z,
-    z: r.x * v.y - r.y * v.x,
-  };
-  const hMag = Math.sqrt(h.x * h.x + h.y * h.y + h.z * h.z);
+  // h = r × v (specific angular momentum)
+  const h = vCross(r, v);
+  const hMag = vLength(h);
 
   // Node vector n = k × h
   const n: Vec3 = { x: -h.y, y: h.x, z: 0 };
   const nMag = Math.sqrt(n.x * n.x + n.y * n.y);
 
   // Eccentricity vector e = (v × h)/μ - r̂
-  const vxh: Vec3 = {
-    x: v.y * h.z - v.z * h.y,
-    y: v.z * h.x - v.x * h.z,
-    z: v.x * h.y - v.y * h.x,
-  };
+  const vxh = vCross(v, h);
+  const rHat = vUnit(r);
   const eVec: Vec3 = {
-    x: vxh.x / MU_EARTH - r.x / rMag,
-    y: vxh.y / MU_EARTH - r.y / rMag,
-    z: vxh.z / MU_EARTH - r.z / rMag,
+    x: vxh.x / MU_EARTH - rHat.x,
+    y: vxh.y / MU_EARTH - rHat.y,
+    z: vxh.z / MU_EARTH - rHat.z,
   };
-  const ecc = Math.sqrt(eVec.x * eVec.x + eVec.y * eVec.y + eVec.z * eVec.z);
+  // 参考: vSub は内部で再利用可能 (cross/dot を import しているため引き続き使える)
+  void vSub;
+  const ecc = vLength(eVec);
 
   // Semi-major axis from vis-viva
-  const energy = vMag * vMag / 2 - MU_EARTH / rMag;
+  const energy = (vMag * vMag) / 2 - MU_EARTH / rMag;
   const sma = -MU_EARTH / (2 * energy);
 
   // Inclination
@@ -171,7 +131,7 @@ export function stateToElements(state: StateVector): OrbitalElements {
   // Argument of periapsis
   let argPe = 0;
   if (nMag > 1e-10 && ecc > 1e-10) {
-    const dot = (n.x * eVec.x + n.y * eVec.y + n.z * eVec.z) / (nMag * ecc);
+    const dot = vDot(n, eVec) / (nMag * ecc);
     argPe = Math.acos(Math.max(-1, Math.min(1, dot)));
     if (eVec.z < 0) argPe = 2 * Math.PI - argPe;
   }
@@ -179,17 +139,14 @@ export function stateToElements(state: StateVector): OrbitalElements {
   // True anomaly
   let trueAnomaly = 0;
   if (ecc > 1e-10) {
-    const dot = (eVec.x * r.x + eVec.y * r.y + eVec.z * r.z) / (ecc * rMag);
+    const dot = vDot(eVec, r) / (ecc * rMag);
     trueAnomaly = Math.acos(Math.max(-1, Math.min(1, dot)));
-    const rdotv = r.x * v.x + r.y * v.y + r.z * v.z;
-    if (rdotv < 0) trueAnomaly = 2 * Math.PI - trueAnomaly;
-  } else {
+    if (vDot(r, v) < 0) trueAnomaly = 2 * Math.PI - trueAnomaly;
+  } else if (nMag > 1e-10) {
     // Circular orbit: use argument of latitude
-    if (nMag > 1e-10) {
-      const dot = (n.x * r.x + n.y * r.y + n.z * r.z) / (nMag * rMag);
-      trueAnomaly = Math.acos(Math.max(-1, Math.min(1, dot)));
-      if (r.z < 0) trueAnomaly = 2 * Math.PI - trueAnomaly;
-    }
+    const dot = vDot(n, r) / (nMag * rMag);
+    trueAnomaly = Math.acos(Math.max(-1, Math.min(1, dot)));
+    if (r.z < 0) trueAnomaly = 2 * Math.PI - trueAnomaly;
   }
 
   return { sma, ecc: Math.max(ecc, 1e-8), inc, raan, argPe, trueAnomaly };
@@ -197,58 +154,35 @@ export function stateToElements(state: StateVector): OrbitalElements {
 
 /**
  * Compute relative state of chaser w.r.t. target in LVLH frame
+ *
+ * LVLH: x=V-bar, y=R-bar, z=H-bar
  */
 export function computeRelativeState(
   target: StateVector,
   chaser: StateVector,
 ): { position: Vec3; velocity: Vec3 } {
-  // LVLH frame: x=V-bar (along velocity), y=R-bar (radial out), z=H-bar (cross-track)
   const r = target.position;
   const v = target.velocity;
-  const rMag = Math.sqrt(r.x * r.x + r.y * r.y + r.z * r.z);
+  const rHat = vUnit(r);
 
-  // Unit vectors
-  const rHat: Vec3 = { x: r.x / rMag, y: r.y / rMag, z: r.z / rMag };
+  const h = vCross(r, v);
+  const hHat = vUnit(h);
 
-  // H = r × v (cross-track)
-  const hx = r.y * v.z - r.z * v.y;
-  const hy = r.z * v.x - r.x * v.z;
-  const hz = r.x * v.y - r.y * v.x;
-  const hMag = Math.sqrt(hx * hx + hy * hy + hz * hz);
-  const hHat: Vec3 = { x: hx / hMag, y: hy / hMag, z: hz / hMag };
+  const vHat: Vec3 = vCross(hHat, rHat);
 
-  // V = H × R (velocity direction)
-  const vHat: Vec3 = {
-    x: hHat.y * rHat.z - hHat.z * rHat.y,
-    y: hHat.z * rHat.x - hHat.x * rHat.z,
-    z: hHat.x * rHat.y - hHat.y * rHat.x,
-  };
+  const dp = vSub(chaser.position, target.position);
+  const dv = vSub(chaser.velocity, target.velocity);
 
-  // Relative position in ECI
-  const dp: Vec3 = {
-    x: chaser.position.x - target.position.x,
-    y: chaser.position.y - target.position.y,
-    z: chaser.position.z - target.position.z,
-  };
-
-  // Relative velocity in ECI
-  const dv: Vec3 = {
-    x: chaser.velocity.x - target.velocity.x,
-    y: chaser.velocity.y - target.velocity.y,
-    z: chaser.velocity.z - target.velocity.z,
-  };
-
-  // Project onto LVLH
   const relPos: Vec3 = {
-    x: dp.x * vHat.x + dp.y * vHat.y + dp.z * vHat.z,  // V-bar
-    y: dp.x * rHat.x + dp.y * rHat.y + dp.z * rHat.z,   // R-bar
-    z: dp.x * hHat.x + dp.y * hHat.y + dp.z * hHat.z,   // H-bar
+    x: vDot(dp, vHat),   // V-bar
+    y: vDot(dp, rHat),   // R-bar
+    z: vDot(dp, hHat),   // H-bar
   };
 
   const relVel: Vec3 = {
-    x: dv.x * vHat.x + dv.y * vHat.y + dv.z * vHat.z,
-    y: dv.x * rHat.x + dv.y * rHat.y + dv.z * rHat.z,
-    z: dv.x * hHat.x + dv.y * hHat.y + dv.z * hHat.z,
+    x: vDot(dv, vHat),
+    y: vDot(dv, rHat),
+    z: vDot(dv, hHat),
   };
 
   return { position: relPos, velocity: relVel };
