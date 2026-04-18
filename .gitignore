@@ -11,3 +11,4 @@ backend/sim_loop/sim-loop.db-wal
 backend/sim_loop/sim-loop.db-shm
 __pycache__/
 *.pyc
+tsconfig.app.tsbuildinfo
