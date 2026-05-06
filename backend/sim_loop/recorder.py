@@ -97,6 +97,24 @@ def record_lesson(
     return lesson_id
 
 
+def mark_lesson_verified(lesson_id: int, verified: bool = True) -> bool:
+    """既存の lesson を verified=True/False にマーク。
+
+    関連する pattern の失敗が修正済みと確認できたら呼ぶ。
+    Returns True if a row was updated, False if lesson_id not found.
+    """
+    db = get_db()
+    cur = db.cursor()
+    cur.execute(
+        "UPDATE sim_loop_lessons SET verified = %s WHERE id = %s",
+        (bool(verified), lesson_id),
+    )
+    updated = cur.rowcount > 0
+    db.commit()
+    db.close()
+    return updated
+
+
 def record_validation(
     project: str,
     model_name: str,
