@@ -2,8 +2,7 @@ node_modules
 dist
 .next
 .git
-.env
-.env.local
+.env*
 *.log
 backend/__pycache__
 backend/sim_loop/__pycache__
